@@ -5,24 +5,32 @@ import (
 	"fmt"
 	"io"
 	"log"
-	"os"
+	"net"
 	"strings"
 )
 
 func main() {
-	f, err := os.Open("messages.txt")
+	listener, err := net.Listen("tcp", ":42069")
 	if err != nil {
-		log.Fatalf("Couldn't open the file: %v", err)
+		log.Fatalf("Couldn't start listener on port 42069: %v", err)
 	}
-	defer f.Close()
+	defer listener.Close()
 
-        lines := getLinesChannel(f)
-	for line := range lines {
-		fmt.Printf("read: %s\n", line)
+	for {
+		conn, err := listener.Accept()
+		if err != nil {
+			fmt.Printf("Couln't accept connection: %v\n", err)
+		}
+		fmt.Println("A connection has been accepted")
+		lines := getLinesChannel(conn)
+		for line := range lines {
+			fmt.Println(line)
+		}
+		fmt.Println("The connection has been closed.")
 	}
 }
 
-func getLinesChannel(f io.ReadCloser) <- chan string {
+func getLinesChannel(f io.ReadCloser) <-chan string {
 	lines := make(chan string)
 	go func() {
 		defer close(lines)
@@ -43,11 +51,11 @@ func getLinesChannel(f io.ReadCloser) <- chan string {
 			chunk := string(buf[:read])
 			parts := strings.Split(chunk, "\n")
 			// min lenth should always be 1, so this is safe
-			for _, part := range parts[:len(parts) - 1] {
+			for _, part := range parts[:len(parts)-1] {
 				lines <- current_line + part
 				current_line = ""
 			}
-			current_line += parts[len(parts) - 1]
+			current_line += parts[len(parts)-1]
 		}
 	}()
 	return lines
