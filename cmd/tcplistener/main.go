@@ -1,7 +1,6 @@
 package main
 
 import (
-	"errors"
 	"fmt"
 	"io"
 	"log"
@@ -9,54 +8,53 @@ import (
 	"strings"
 )
 
-func main() {
-	listener, err := net.Listen("tcp", ":42069")
-	if err != nil {
-		log.Fatalf("Couldn't start listener on port 42069: %v", err)
-	}
-	defer listener.Close()
-
-	for {
-		conn, err := listener.Accept()
-		if err != nil {
-			fmt.Printf("Couln't accept connection: %v\n", err)
-		}
-		fmt.Println("A connection has been accepted")
-		lines := getLinesChannel(conn)
-		for line := range lines {
-			fmt.Println(line)
-		}
-		fmt.Println("The connection has been closed.")
-	}
-}
-
 func getLinesChannel(f io.ReadCloser) <-chan string {
-	lines := make(chan string)
+	ch := make(chan string)
 	go func() {
-		defer close(lines)
-		buf := make([]byte, 8)
-		current_line := ""
+		defer close(ch)
+		data := make([]byte, 8)
+		line := ""
 		for {
-			read, err := f.Read(buf)
+			count, err := f.Read(data)
 			if err != nil {
-				if current_line != "" {
-					// dump any leftovers
-					lines <- current_line
+				if err == io.EOF {
+					if len(line) != 0 {
+						ch <- line
+						line = ""
+					}
+					return
 				}
-				if errors.Is(err, io.EOF) {
-					break
-				}
-				log.Fatalf("error reading the input file: %v", err)
+				fmt.Printf("fuckerror: %e", err)
 			}
-			chunk := string(buf[:read])
-			parts := strings.Split(chunk, "\n")
-			// min lenth should always be 1, so this is safe
-			for _, part := range parts[:len(parts)-1] {
-				lines <- current_line + part
-				current_line = ""
+			parts := strings.Split(string(data[:count]), "\n")
+			for i := 0; i < len(parts)-1; i++ {
+				line += parts[i]
+				ch <- line
+				line = ""
 			}
-			current_line += parts[len(parts)-1]
+			line += parts[len(parts)-1]
 		}
 	}()
-	return lines
+	return ch
+}
+
+func main() {
+	ln, err := net.Listen("tcp", ":42069")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer ln.Close()
+
+	for {
+		conn, err := ln.Accept()
+		if err != nil {
+			fmt.Printf("error when accepting connection: %e", err)
+		}
+		fmt.Println("Connection accepted")
+		ch := getLinesChannel(conn)
+		for line := range ch {
+			fmt.Printf("%s\n", line)
+		}
+		fmt.Println("Connection closed")
+	}
 }
