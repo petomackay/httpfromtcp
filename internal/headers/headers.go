@@ -7,11 +7,62 @@ import (
 	"strings"
 )
 
+const specialChars string = "!#$%&'*+-.^_`|~"
+
 type Headers map[string]string
 
 func NewHeaders() Headers {
 	h := make(map[string]string)
 	return h
+}
+
+func (h Headers) Set(header, value string) {
+	headerLC := strings.ToLower(header)
+	fmt.Printf("Setting the header: '%s' to value: '%s'\n", headerLC, value)
+	h[headerLC] = value
+}
+
+func (h Headers) Get(header string) string {
+	headerLC := strings.ToLower(header)
+	return h[headerLC]
+}
+
+func validateHeaderKey(header string) error {
+	headerLength := len(header)
+
+	if headerLength == 0 {
+		return fmt.Errorf("Header key cannot be empty")
+	}
+
+	if headerLength != len(strings.TrimSpace(header)) {
+		err := fmt.Errorf("Header field value contains whitespace: '%s'", header)
+		return err
+	}
+
+	for pos, char := range header {
+		if isValidTChar(char) {
+			fmt.Printf("char: %c at position: %d is valid\n", char, pos)
+		} else {
+			fmt.Printf("char: %c at position: %d is invalid\n", char, pos)
+			err := fmt.Errorf("Header key contains invalid char at position %d: %c", pos, char)
+			return err
+		}
+	}
+
+	return nil
+}
+
+func isValidTChar(c rune) bool {
+	if (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') {
+		return true
+	}
+	if c >= '0' && c <= '9' {
+		return true
+	}
+	if strings.ContainsRune(specialChars, c) {
+		return true
+	}
+	return false
 }
 
 func (h Headers) Parse(data []byte) (n int, done bool, err error) {
@@ -34,15 +85,15 @@ func (h Headers) Parse(data []byte) (n int, done bool, err error) {
 	}
 
 	header := hlString[:separatorIndex]
-	if len(header) != len(strings.TrimSpace(header)) {
-		err := fmt.Errorf("Header field value contains whitespace: '%s'", header)
+	err = validateHeaderKey(header)
+	if err != nil {
 		return 0, false, err
 	}
 
 	value := strings.TrimSpace(hlString[separatorIndex+1:])
 	fmt.Printf("the header: '%s'\nhas value: '%s'\n", header, value)
 
-	h[header] = value
+	h.Set(header, value)
 
 	return crlfIdx + 2, false, nil
 }
