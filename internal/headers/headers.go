@@ -18,7 +18,10 @@ func NewHeaders() Headers {
 
 func (h Headers) Set(header, value string) {
 	headerLC := strings.ToLower(header)
-	fmt.Printf("Setting the header: '%s' to value: '%s'\n", headerLC, value)
+	val, ok := h[headerLC]
+	if ok {
+		value = fmt.Sprintf("%s, %s", val, value)
+	}
 	h[headerLC] = value
 }
 

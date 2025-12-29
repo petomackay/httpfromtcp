@@ -72,4 +72,14 @@ func TestHeadersParser(t *testing.T) {
 	require.Error(t, err)
 	assert.Equal(t, 0, n)
 	assert.False(t, done)
+
+	// Test: Valid 2 same key headers with existing headers
+	headers = map[string]string{"accept": "text/plain"}
+	data = []byte("Accept: text/html\r\n\r\n")
+	n, done, err = headers.Parse(data)
+	require.NoError(t, err)
+	require.NotNil(t, headers)
+	assert.Equal(t, "text/plain, text/html", headers["accept"])
+	assert.Equal(t, 19, n)
+	assert.False(t, done)
 }
