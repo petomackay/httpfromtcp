@@ -43,10 +43,7 @@ func validateHeaderKey(header string) error {
 	}
 
 	for pos, char := range header {
-		if isValidTChar(char) {
-			fmt.Printf("char: %c at position: %d is valid\n", char, pos)
-		} else {
-			fmt.Printf("char: %c at position: %d is invalid\n", char, pos)
+		if !isValidTChar(char) {
 			err := fmt.Errorf("Header key contains invalid char at position %d: %c", pos, char)
 			return err
 		}
@@ -69,12 +66,14 @@ func isValidTChar(c rune) bool {
 }
 
 func (h Headers) Parse(data []byte) (n int, done bool, err error) {
+	fmt.Println("Trying to parse headers with following data: ", string(data))
 	crlfIdx := bytes.Index(data, []byte("\r\n"))
 	if crlfIdx == -1 {
 		// incomplete header value
 		return 0, false, nil
 	}
 	if crlfIdx == 0 {
+		fmt.Println("HEADERS: I AM DONE")
 		return 2, true, nil
 	}
 

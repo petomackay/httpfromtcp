@@ -7,10 +7,13 @@ import (
 	"io"
 	"slices"
 	"strings"
+
+	"github.com/petomackay/httpfromtcp/internal/headers"
 )
 
 type Request struct {
 	RequestLine  RequestLine
+	Headers      headers.Headers
 	requestState requestState
 }
 
@@ -24,6 +27,7 @@ type requestState int
 
 const (
 	requestStateInitialized requestState = iota
+	requestStateParsingHeaders
 	requestStateDone
 )
 
@@ -71,21 +75,33 @@ func parseRequestLine(data []byte) (int, *RequestLine, error) {
 }
 
 func (r *Request) parse(data []byte) (int, error) {
-	// TODO: switch instead
-	if r.requestState == 0 {
+	switch r.requestState {
+	case requestStateInitialized:
 		n, rl, err := parseRequestLine(data)
 		if err != nil || n == 0 {
 			// either there was an error, or no error == need more data
 			return 0, err
 		}
 		r.RequestLine = *rl
-		r.requestState = 1
+		r.requestState = requestStateParsingHeaders
 		return n, nil
-	}
-	if r.requestState == 1 {
+
+	case requestStateParsingHeaders:
+		h := r.Headers
+		n, done, err := h.Parse(data)
+		if err != nil {
+			return 0, err
+		}
+		if done {
+			r.requestState = requestStateDone
+			fmt.Println("Header parsing done")
+		}
+		return n, nil
+	case requestStateDone:
 		return 0, fmt.Errorf("Trying to read data in a done state")
+	default:
+		return 0, fmt.Errorf("Unkown request state: %d", r.requestState)
 	}
-	return 0, fmt.Errorf("Unkown request state: %d", r.requestState)
 }
 
 func RequestFromReader(request io.Reader) (*Request, error) {
@@ -93,6 +109,7 @@ func RequestFromReader(request io.Reader) (*Request, error) {
 	readToIndex := 0
 	req := &Request{
 		requestState: requestStateInitialized,
+		Headers:      headers.NewHeaders(),
 	}
 
 	for req.requestState != requestStateDone {
@@ -104,6 +121,9 @@ func RequestFromReader(request io.Reader) (*Request, error) {
 		n, err := request.Read(buf[readToIndex:])
 		if err != nil {
 			if errors.Is(err, io.EOF) {
+				// TODO: is it safe to just go to DONE here?
+				// can we have leftovers in the buffer that were not processed yet?
+				// NOPE, we need to make sure the buffer is drained after we finish reading before breaking
 				req.requestState = requestStateDone
 				break
 			}
@@ -117,6 +137,7 @@ func RequestFromReader(request io.Reader) (*Request, error) {
 		copy(buf, buf[nParsed:])
 		readToIndex -= nParsed
 	}
+	fmt.Println("REQUEST PARSING DONE")
 
 	return req, nil
 }
