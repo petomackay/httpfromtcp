@@ -112,27 +112,40 @@ func RequestFromReader(request io.Reader) (*Request, error) {
 		Headers:      headers.NewHeaders(),
 	}
 
+	doneReading := false
+
 	for req.requestState != requestStateDone {
 		if readToIndex >= len(buf) {
 			newBuf := make([]byte, len(buf)*2)
 			copy(newBuf, buf)
 			buf = newBuf
 		}
-		n, err := request.Read(buf[readToIndex:])
+		var n int
+		var err error
+		if !doneReading {
+			n, err = request.Read(buf[readToIndex:])
+		}
 		if err != nil {
 			if errors.Is(err, io.EOF) {
-				// TODO: is it safe to just go to DONE here?
-				// can we have leftovers in the buffer that were not processed yet?
-				// NOPE, we need to make sure the buffer is drained after we finish reading before breaking
-				req.requestState = requestStateDone
-				break
+				// we still might have data in the buffer that needs parsing
+				doneReading = true
+				if readToIndex == 0 {
+					if req.requestState != requestStateDone {
+						return nil, fmt.Errorf("Incomplete request")
+					}
+					break
+				}
+			} else {
+				return nil, err
 			}
-			return nil, err
 		}
 		readToIndex += n
 		nParsed, err := req.parse(buf[:readToIndex])
 		if err != nil {
 			return nil, err
+		}
+		if doneReading && nParsed == 0 {
+			return nil, fmt.Errorf("Incomplete request")
 		}
 		copy(buf, buf[nParsed:])
 		readToIndex -= nParsed
