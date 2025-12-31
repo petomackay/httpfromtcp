@@ -66,19 +66,19 @@ func isValidTChar(c rune) bool {
 }
 
 func (h Headers) Parse(data []byte) (n int, done bool, err error) {
-	fmt.Println("Trying to parse headers with following data: ", string(data))
+	//fmt.Println("Trying to parse headers with following data: ", string(data))
 	crlfIdx := bytes.Index(data, []byte("\r\n"))
 	if crlfIdx == -1 {
 		// incomplete header value
 		return 0, false, nil
 	}
 	if crlfIdx == 0 {
-		fmt.Println("HEADERS: I AM DONE")
+		//fmt.Println("HEADERS: I AM DONE")
 		return 2, true, nil
 	}
 
 	hlString := strings.TrimSpace(string(data[:crlfIdx]))
-	fmt.Printf("the header line is: '%s'\n", hlString)
+	//fmt.Printf("the header line is: '%s'\n", hlString)
 
 	separatorIndex := strings.Index(hlString, ":")
 	if separatorIndex == -1 {
@@ -93,7 +93,7 @@ func (h Headers) Parse(data []byte) (n int, done bool, err error) {
 	}
 
 	value := strings.TrimSpace(hlString[separatorIndex+1:])
-	fmt.Printf("the header: '%s'\nhas value: '%s'\n", header, value)
+	//fmt.Printf("the header: '%s'\nhas value: '%s'\n", header, value)
 
 	h.Set(header, value)
 

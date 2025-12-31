@@ -94,7 +94,7 @@ func (r *Request) parse(data []byte) (int, error) {
 		}
 		if done {
 			r.requestState = requestStateDone
-			fmt.Println("Header parsing done")
+			//fmt.Println("Header parsing done")
 		}
 		return n, nil
 	case requestStateDone:
@@ -150,7 +150,7 @@ func RequestFromReader(request io.Reader) (*Request, error) {
 		copy(buf, buf[nParsed:])
 		readToIndex -= nParsed
 	}
-	fmt.Println("REQUEST PARSING DONE")
+	//fmt.Println("REQUEST PARSING DONE")
 
 	return req, nil
 }
