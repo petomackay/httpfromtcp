@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/petomackay/httpfromtcp/internal/headers"
@@ -14,6 +15,7 @@ import (
 type Request struct {
 	RequestLine  RequestLine
 	Headers      headers.Headers
+	Body         []byte
 	requestState requestState
 }
 
@@ -28,6 +30,7 @@ type requestState int
 const (
 	requestStateInitialized requestState = iota
 	requestStateParsingHeaders
+	requestStateParsingBody
 	requestStateDone
 )
 
@@ -93,10 +96,41 @@ func (r *Request) parse(data []byte) (int, error) {
 			return 0, err
 		}
 		if done {
-			r.requestState = requestStateDone
+			nextState := requestStateParsingBody
+			if r.Headers.Get("content-length") == "" {
+				nextState = requestStateDone
+			}
+			r.requestState = nextState
 			//fmt.Println("Header parsing done")
 		}
 		return n, nil
+	case requestStateParsingBody:
+		contentLengthValue := r.Headers.Get("content-length")
+		if contentLengthValue == "" {
+			r.requestState = requestStateDone
+			return 0, fmt.Errorf("Invalid state: parsing body with no content-length header!")
+		}
+		contentLength, err := strconv.Atoi(contentLengthValue)
+		if err != nil {
+			return 0, err
+		}
+		if r.Body == nil {
+			r.Body = make([]byte, 0, contentLength)
+		}
+		//fmt.Println("parsing body with:")
+		//fmt.Printf("BEGIN|%v|END", data)
+		//fmt.Println("\nend of body")
+		fmt.Printf("The length of body is: %d\n", len(data))
+		fmt.Printf("The capacity of body is: %d\n", cap(data))
+		r.Body = append(r.Body, data[:len(data)]...)
+		fmt.Printf("the current body length: %d\ncontent length: %d\n", len(r.Body), contentLength)
+		if len(r.Body) == contentLength {
+			r.requestState = requestStateDone
+		}
+		if len(r.Body) > contentLength {
+			return 0, fmt.Errorf("Body is longer than content-length")
+		}
+		return len(data), nil
 	case requestStateDone:
 		return 0, fmt.Errorf("Trying to read data in a done state")
 	default:
