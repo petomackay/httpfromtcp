@@ -97,7 +97,8 @@ func (r *Request) parse(data []byte) (int, error) {
 		}
 		if done {
 			nextState := requestStateParsingBody
-			if r.Headers.Get("content-length") == "" {
+			cl := r.Headers.Get("content-length")
+			if cl == "" || cl == "0" {
 				nextState = requestStateDone
 			}
 			r.requestState = nextState
